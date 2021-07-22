@@ -37,28 +37,61 @@ class Block {
   }
   static fromBuffer(buffer) {
     if (buffer.length < 80) throw new Error('Buffer too small (< 80 bytes)');
-    let offset = 0;
-    const readSlice = n => {
-      offset += n;
-      return buffer.slice(offset - n, offset);
-    };
-    const readUInt32 = () => {
-      const i = buffer.readUInt32LE(offset);
-      offset += 4;
-      return i;
-    };
-    const readInt32 = () => {
-      const i = buffer.readInt32LE(offset);
-      offset += 4;
-      return i;
+    const bufferReader = new bufferutils_1.BufferReader(buffer);
+
+    const readProof = () => {
+      // TODO: implements
+      const proof = proof_1.Proof.fromBuffer(
+        buffer.slice(offset),
+        true,
+      );
+      offset += proof.byteLength();
+      return proof;
     };
     const block = new Block();
-    block.version = readInt32();
-    block.prevHash = readSlice(32);
-    block.merkleRoot = readSlice(32);
-    block.timestamp = readUInt32();
-    block.bits = readUInt32();
-    block.nonce = readUInt32();
+    const version = bufferReader.readUInt32();
+    const isDynaFed = version >> 31;
+    block.version = (version << 1) >>> 1;
+    block.prevHash = bufferReader.readSlice(32);
+    block.merkleRoot = bufferReader.readSlice(32);
+    block.timestamp = bufferReader.readUInt32();
+    block.blockHeight = bufferReader.readUInt32();
+    if (isDynaFed) {
+      const serializeType = bufferReader.readUInt8()
+      const signblockscript = bufferReader.readVarSlice()
+      const signblockWitnessLimit = bufferReader.readUInt32()
+      if (serializeType === 1) {
+        const elidedRoot = bufferReader.readSlice(32)
+        block.dynamicParameters = {
+          signblockscript,
+          signblockWitnessLimit,
+          elidedRoot
+        }
+      }
+      if (serializeType === 2) {
+        const fedpegProgram = bufferReader.readVarSlice()
+        const fedpegscript = bufferReader.readVarSlice()
+        const len = bufferReader.readVarInt()
+        const extensionSpace = []
+        for (let i = 0; i < len; i++) extensionSpace.push(bufferReader.readVarSlice())
+
+        block.dynamicParameters = {
+          signblockscript,
+          signblockWitnessLimit,
+          fedpegProgram,
+          fedpegscript,
+          extensionSpace
+        }
+      }
+    } else {
+      if (false) {
+      // if (SIGNED_BLOCKS) {
+        block.proof = readProof()
+      } else {
+        block.nBits = bufferReader.readUInt32()
+        block.nNonce = bufferReader.readUInt32()
+      }
+    }
     if (buffer.length === 80) return block;
     const readVarInt = () => {
       const vi = varuint.decode(buffer, offset);
@@ -67,13 +100,17 @@ class Block {
     };
     const readTransaction = () => {
       const tx = transaction_1.Transaction.fromBuffer(
-        buffer.slice(offset),
+        buffer.slice(bufferReader.offset),
         true,
       );
-      offset += tx.byteLength();
+      bufferReader.offset += tx.byteLength();
       return tx;
     };
-    const nTransactions = readVarInt();
+
+    // TODO figure out these 4 bytes, signblock_witness.stack?
+    console.log(bufferReader.readSlice(4))
+
+    const nTransactions = bufferReader.readVarInt();
     block.transactions = [];
     for (let i = 0; i < nTransactions; ++i) {
       const tx = readTransaction();
