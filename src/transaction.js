@@ -361,13 +361,13 @@ class Transaction {
     txTmp.__toBuffer(buffer, 0, false, true, true);
     return bcrypto.hash256(buffer);
   }
-  hashForWitnessV0(inIndex, prevOutScript, value, hashType) {
+  serializeForWitnessV0(inIndex, prevOutScript, value, hashType, sequence = 0) {
     typeforce(
       types.tuple(types.UInt32, types.Buffer, types.Buffer, types.UInt32),
       arguments,
     );
     function writeInputs(ins) {
-      const tBuffer = Buffer.allocUnsafe(36 * ins.length);
+      const tBuffer = Buffer.alloc(36 * Math.max(ins.length, 1));
       const tBufferWriter = new bufferutils_1.BufferWriter(tBuffer, 0);
       ins.forEach(txIn => {
         tBufferWriter.writeSlice(txIn.hash);
@@ -466,7 +466,9 @@ class Transaction {
     ) {
       hashOutputs = writeOutputs([this.outs[inIndex]]);
     }
-    const input = this.ins[inIndex];
+    const input = this.ins.length > inIndex
+      ? this.ins[inIndex]
+      : { hash: Buffer.alloc(32), index: 0, sequence };
     const hasIssuance = !types.Null(input.issuance);
     const bufferSize =
       4 + // version
@@ -502,7 +504,10 @@ class Transaction {
     bufferWriter.writeSlice(hashOutputs);
     bufferWriter.writeUInt32(this.locktime);
     bufferWriter.writeUInt32(hashType);
-    return bcrypto.hash256(buffer);
+    return buffer
+  }
+  hashForWitnessV0(...args) {
+    return bcrypto.hash256(this.serializeForWitnessV0(...args));
   }
   getHash(forWitness) {
     // wtxid for coinbase is always 32 bytes of 0x00
