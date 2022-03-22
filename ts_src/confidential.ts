@@ -2,13 +2,9 @@ import * as bufferutils from './bufferutils';
 import * as crypto from './crypto';
 
 import { Output } from './transaction';
-import secp256k1 from '@vulpemventures/secp256k1-zkp';
-
-const secp256k1Promise = secp256k1();
 
 async function nonceHash(pubkey: Buffer, privkey: Buffer): Promise<Buffer> {
-  const { ecdh } = await secp256k1Promise;
-  return crypto.sha256(ecdh(pubkey, privkey));
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export async function valueBlindingFactor(
@@ -19,12 +15,7 @@ export async function valueBlindingFactor(
   inFactors: Buffer[],
   outFactors: Buffer[],
 ): Promise<Buffer> {
-  const { pedersen } = await secp256k1Promise;
-  const values = inValues.concat(outValues);
-  const nInputs = inValues.length;
-  const generators = inGenerators.concat(outGenerators);
-  const factors = inFactors.concat(outFactors);
-  return pedersen.blindGeneratorBlindSum(values, nInputs, generators, factors);
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export async function valueCommitment(
@@ -32,19 +23,14 @@ export async function valueCommitment(
   gen: Buffer,
   factor: Buffer,
 ): Promise<Buffer> {
-  const { generator, pedersen } = await secp256k1Promise;
-  const generatorParsed = generator.parse(gen);
-  const commit = pedersen.commit(factor, value, generatorParsed);
-  return pedersen.commitSerialize(commit);
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export async function assetCommitment(
   asset: Buffer,
   factor: Buffer,
 ): Promise<Buffer> {
-  const { generator } = await secp256k1Promise;
-  const gen = generator.generateBlinded(asset, factor);
-  return generator.serialize(gen);
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export interface UnblindOutputResult {
@@ -58,30 +44,14 @@ export async function unblindOutputWithKey(
   out: Output,
   blindingPrivKey: Buffer,
 ): Promise<UnblindOutputResult> {
-  const nonce = await nonceHash(out.nonce, blindingPrivKey);
-  return unblindOutputWithNonce(out, nonce);
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export async function unblindOutputWithNonce(
   out: Output,
   nonce: Buffer,
 ): Promise<UnblindOutputResult> {
-  const secp = await secp256k1Promise;
-  const gen = secp.generator.parse(out.asset);
-  const { value, blindFactor, message } = secp.rangeproof.rewind(
-    out.value,
-    out.rangeProof!,
-    nonce,
-    gen,
-    out.script,
-  );
-
-  return {
-    value,
-    asset: message.slice(0, 32),
-    valueBlindingFactor: blindFactor,
-    assetBlindingFactor: message.slice(32),
-  };
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export interface RangeProofInfoResult {
@@ -94,14 +64,7 @@ export interface RangeProofInfoResult {
 export async function rangeProofInfo(
   proof: Buffer,
 ): Promise<RangeProofInfoResult> {
-  const { rangeproof } = await secp256k1Promise;
-  const { exp, mantissa, minValue, maxValue } = rangeproof.info(proof);
-  return {
-    minValue: parseInt(minValue, 10),
-    maxValue: parseInt(maxValue, 10),
-    ctExp: exp,
-    ctBits: parseInt(mantissa, 10),
-  };
+  throw new Error('Confidential transactions are not supported.')
 }
 
 /**
@@ -120,19 +83,7 @@ export async function rangeProofWithNonceHash(
   exp?: number,
   minBits?: number,
 ): Promise<Buffer> {
-  const nonce = await nonceHash(blindingPubkey, ephemeralPrivkey);
-  return rangeProof(
-    value,
-    nonce,
-    asset,
-    assetBlindingFactor,
-    valueBlindFactor,
-    valueCommit,
-    scriptPubkey,
-    minValue,
-    exp,
-    minBits,
-  );
+  throw new Error('Confidential transactions are not supported.')
 }
 
 /**
@@ -150,28 +101,7 @@ export async function rangeProof(
   exp?: number,
   minBits?: number,
 ): Promise<Buffer> {
-  const { generator, pedersen, rangeproof } = await secp256k1Promise;
-
-  const gen = generator.generateBlinded(asset, assetBlindingFactor);
-  const message = Buffer.concat([asset, assetBlindingFactor]);
-  const commit = pedersen.commitParse(valueCommit);
-
-  const mv = minValue ? minValue : '1';
-  const e = exp ? exp : 0;
-  const mb = minBits ? minBits : 36;
-
-  return rangeproof.sign(
-    commit,
-    valueBlindFactor,
-    nonce,
-    value,
-    gen,
-    mv,
-    e,
-    mb,
-    message,
-    scriptPubkey,
-  );
+  throw new Error('Confidential transactions are not supported.')
 }
 
 export async function surjectionProof(
@@ -181,36 +111,7 @@ export async function surjectionProof(
   inputAssetBlindingFactors: Buffer[],
   seed: Buffer,
 ): Promise<Buffer> {
-  const { generator, surjectionproof } = await secp256k1Promise;
-  const outputGenerator = generator.generateBlinded(
-    outputAsset,
-    outputAssetBlindingFactor,
-  );
-
-  const inputGenerators = inputAssets.map((v, i) =>
-    generator.generateBlinded(v, inputAssetBlindingFactors[i]),
-  );
-  const nInputsToUse = inputAssets.length > 3 ? 3 : inputAssets.length;
-  const maxIterations = 100;
-
-  const init = surjectionproof.initialize(
-    inputAssets,
-    nInputsToUse,
-    outputAsset,
-    maxIterations,
-    seed,
-  );
-
-  const proof = surjectionproof.generate(
-    init.proof,
-    inputGenerators,
-    outputGenerator,
-    init.inputIndex,
-    inputAssetBlindingFactors[init.inputIndex],
-    outputAssetBlindingFactor,
-  );
-
-  return surjectionproof.serialize(proof);
+  throw new Error('Confidential transactions are not supported.')
 }
 
 const CONFIDENTIAL_VALUE = 9; // explicit size of confidential values
